@@ -16,16 +16,16 @@
 
 #define DEBUG_BUTTON 3
 
+#define CHECK_FOR_DAYLIGHT_EVERY 300000  //ms how often to check daylight
 
-#define CHECK_FOR_DAYLIGHT_EVERY 30000  //ms how often to check daylight
-
-#define DURATION_DISPLAY_ON 60000  //ms how long the display should stay on
-#define CYCLES_TO_WAIT 0          //40; // multiplied with 8sec = time to wait between brightness checks to wake up from night sleep
+#define DURATION_DISPLAY_ON 120000  //ms how long the display should stay on
+#define CYCLES_TO_WAIT 40           // multiplied with 8sec = time to wait between brightness checks to wake up from night sleep
 
 
-#define LIMIT_NIGHT 12        // Measured limit to activate night mode
-#define LIMIT_DAY 20          // Measured limit to activate day mode
+#define LIMIT_NIGHT 14       //20        // Measured limit to activate night mode
+#define LIMIT_DAY 30         //42          // Measured limit to activate day mode
 #define MEASUREMENTS_LIMIT 5  //consecutive measurements below LIMIT_NIGHT required before power down.
+#define HOURS_DAY_MIN 12      //minimum hours it must run every day before checking daylight
 
 #include <LiquidCrystal.h>  //LCD-Bibliothek laden
 #include <avr/wdt.h>
@@ -33,17 +33,13 @@
 #include <EEPROM.h>
 
 /* Fuses:
-
-READ: 
-C:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17\bin\avrdude.exe "-CC:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17/etc/avrdude.conf" -v -patmega328p -cstk500v2 -Pusb -U hfuse:r:-:h -U lfuse:r:-:h
-
-SET LATENCY
-C:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17\bin\avrdude.exe "-CC:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17/etc/avrdude.conf" -v -patmega328p -cstk500v2 -Pusb -e -B64
-
-WRITE:
- C:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17\bin\avrdude.exe "-CC:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17/etc/avrdude.conf" -v -patmega328p -cstk500v2 -Pusb -e -U lfuse:w:0xE3:m -U hfuse:w:0xD1:m -U efuse:w:0xFF:m -U lock:w:0x3F:m
-
  -U lfuse:w:0x62:m -U hfuse:w:0xD1:m -U efuse:w:0xFF:m -U lock:w:0x3F:m
+
+  //EEPROM address > 12: each byte represents a single day. Memory entries have the following meaning:
+  // 255 = invalid memory range
+  // 254 = null / empty
+  // 253 = maximum
+  // 0-252 = amount of bikers crossed.
 
 */
 
@@ -74,13 +70,26 @@ long todayStartedAtMillis = 0;
 // EEPROM Location to store todays count.
 int todaysEepromByteAddress = 0;
 
+// millis when last display content was updated.
+long lastDisplayUpdate = millis();
+
+// when the last daylight recording page was switched
+long lastDisplayPageSwitch = millis();
 
 //count of contacts today
 int todayCount = 0;
-long overallCount; // = 32760;
+long overallCount;
 
 //indicates if the Light barrier is durable blocked (longer than 2 sec).
 bool permanentBlocked = false;
+
+//pagination of stored daylight recordings
+int page = 0;
+// last measurements during past daycycles
+short pageContent[4] = { 0, 0, 0, 0 };
+
+//daymode of the last check: react only on changes
+bool lastDayMode = false;
 
 /*
  * Here we go
@@ -105,66 +114,105 @@ void setup() {
   digitalWrite(LIGHTBARRIER_ON, HIGH);
   digitalWrite(DEBUG_LED, LOW);
 
-
   lcd.begin(16, 2);
   lcd.clear();
   lcd.setCursor(0, 0);  //col, row
   lcd.print("MTB-Murgtal e.V.");
   lcd.setCursor(0, 1);  //col, row
   lcd.print("Fahrtenzaehler");
-      
-for (short i = 0; i < 4; i++) {
-        debugLED(ON);
-        delay(250);
-        debugLED(OFF);
-        delay(250);
-      }
-  overallCount = readOverallCount();
 
+  for (short i = 0; i < 4; i++) {
+    debugLED(ON);
+    delay(250);
+    debugLED(OFF);
+    delay(250);
+  }
+
+  if (readDebugButton()) {
+    resetMemory();
+  }
+  overallCount = readOverallCount();
   determineTodayStorageByte();
+  storeTodayCount();
   watchdogSetup();
+  activateDisplay(ON);
 }
- 
-long lastDisplayUpdate = millis();
+
+
+/*
+ * Reset memory, if Debug button is pushed on startup for > 9 sec.
+ */
+void resetMemory() {
+  for (short i = 9; i > 0; i--) {    
+    lcd.clear();
+    lcd.setCursor(0, 0);  //col, row
+    lcd.print("Loesche Speicher");
+    lcd.setCursor(0, 1);  //col, row
+    lcd.print(i);
+    lcd.print(" sec. halten");
+    delay(1000);
+    if (!readDebugButton()) return;
+  }
+  lcd.clear();
+  for (int i = 13; i < EEPROM.length(); i++) {
+    EEPROM.write(i, 254);
+  }
+  for (int i = 0; i < 13; i++) {
+    EEPROM.write(i, 0);
+  }
+
+  lcd.setCursor(0, 0);  //col, row
+  lcd.print("Speicher");  
+  lcd.setCursor(0, 1);  //col, row
+  lcd.print("geloescht");
+  delay (2000);
+}
+
 void loop() {
 
   checkBarrier();
- 
-  if (displayOn && lastDisplayUpdate + 500 < millis() )   {
+
+  //update display every 0,5 sec if on:
+  if (displayOn && lastDisplayUpdate + 500 < millis()) {
     showOutput();
     lastDisplayUpdate = millis();
   }
-  
 
+  if (displayOn && lastDisplayPageSwitch + 10000 < millis()) {
+    page++;
+    lastDisplayPageSwitch = millis();
+  }
+
+  // check if debug button is pushed
   if (readDebugButton()) {
     debugLED(ON);
     activateDisplay(ON);
-    showDebugOutput();    
-    delay (200);
+    showDebugOutput();
+    delay(200);
     debugLED(OFF);
   }
 
-  if (readUserButton()){
+  // check if user button is pushed
+  if (readUserButton()) {
+    page = 0;
+    lastDisplayPageSwitch = millis();
     debugLED(ON);
     activateDisplay(ON);
     showOutput();
-    delay (200);
+    delay(200);
     debugLED(OFF);
   }
 
   if (isDay) {
     if (displayOn && millisDisplayOff < millis()) activateDisplay(OFF);
 
-    digitalWrite(PHOTODIODE_ON, HIGH);
-    digitalWrite(LIGHTBARRIER_ON, HIGH);
     if (checkForDaylightIntervall < millis()) {
       checkForDaylight();
       checkForDaylightIntervall = millis() + CHECK_FOR_DAYLIGHT_EVERY;
     }
+
   } else if (!isDay) {
     if (displayOn) activateDisplay(OFF);
-    digitalWrite(PHOTODIODE_ON, LOW);
-    digitalWrite(LIGHTBARRIER_ON, LOW);
 
     wdt_reset();
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);  // choose power down mode
@@ -179,7 +227,6 @@ void loop() {
 }
 
 
-
 /* 
  * Barrier should contacts longer 25ms (30cm object at 5km/h) and shorter 250ms (30cm object at 40km/h). 
  * After first contact, we block the sensor for 300ms (two biker at 30km/h with a gap of 2,5m between).
@@ -190,7 +237,7 @@ bool checkBarrier() {
   bool detection = false;
   permanentBlocked = false;
   while (objectDetected()) {
-   // delay(1);
+    // delay(1);
     detection = true;
     if (millis() > startContact + 2000) {
       for (short i = 0; i < 10; i++) {
@@ -203,33 +250,62 @@ bool checkBarrier() {
       return false;
     }
   }
-  if (detection) {    
+  if (detection) {
     lastContactDuration = millis() - startContact;
-    storeOverallCount (++overallCount);
-    storeTodayCount(++todayCount);
+    storeOverallCount(++overallCount);
+    todayCount++;
+    storeTodayCount();
     delay(300);
   }
   return detection;
 }
 
 
+/*
+ * Visualize current count, battery voltage and last daylight period counts
+ */
 void showOutput() {
-  
+
   lcd.clear();
   lcd.noCursor();
-  lcd.setCursor(0, 0);  //col, row 
+  lcd.setCursor(0, 0);  //col, row
   lcd.print(overallCount);
-  
+
+
   lcd.setCursor(12, 0);  //col, row
   lcd.print(readBatteryVoltage(), 1);
-  lcd.print("V");  
+  lcd.print("V");
 
-  if (permanentBlocked){
+
+  if (permanentBlocked) {
     lcd.setCursor(0, 1);  //col, row
     lcd.print("LS BLOCKIERT    ");
+  } else {
+    if (overallCount < 100000000) {
+      lcd.setCursor(8, 0);
+      lcd.print("P");
+    }
+    lcd.print(page);
+    lcd.setCursor(0, 1);  //col, row
+    getDaylightRecordings();
+    for (short i = 0; i < 4; i++) {
+      if (pageContent[i] >= 254) {
+        lcd.print("---");
+      } else if (pageContent[i] == 253) {
+        lcd.print("MAX");
+      } else {
+        if (pageContent[i] < 100) lcd.print("0");
+        if (pageContent[i] < 10) lcd.print("0");
+        lcd.print(pageContent[i]);
+      }
+      lcd.print(" ");
+    }
   }
 }
 
+/*
+ * Show some debug output on lcd display
+ */
 void showDebugOutput() {
   digitalWrite(PHOTODIODE_ON, HIGH);
   delay(25);
@@ -240,9 +316,9 @@ void showDebugOutput() {
   lcd.clear();
   lcd.noCursor();
   lcd.setCursor(0, 0);  //col, row
-  lcd.print("Light:");
+  lcd.print("B:");
   lcd.print(brightness);
-  if (checkForDaylight()) {
+  if (isDay) {
     lcd.print("D");
   } else {
     lcd.print("N");
@@ -253,12 +329,16 @@ void showDebugOutput() {
   lcd.print("V");
 
   lcd.setCursor(0, 1);
-  lcd.print("Today:");
+  lcd.print("C:");
   lcd.print(todayCount);
 
-  lcd.setCursor(7, 1);
-  lcd.print(" Dur:");
+  lcd.setCursor(9, 1);
+  lcd.print(" D:");
   lcd.print(lastContactDuration);
+
+  //lcd.setCursor(8, 1);
+  //lcd.print("M:");
+  //lcd.print(todaysEepromByteAddress);
 }
 
 /* 
@@ -282,12 +362,16 @@ bool readUserButton() {
 void debugLED(bool on) {
   digitalWrite(DEBUG_LED, on);
 }
+
 /*
  * Will check for brightness. 
  * If the brightness is measured MEASUREMENT_LIMIT times higher than defined LIMIT_DAY, this method will returns always true. 
  * If the brightness is measured MEASUREMENT_LIMIT times lower then defined LIMIT_NIGHT, this method will returns always false.
  */
 bool checkForDaylight() {
+  if (todayStartedAtMillis + (HOURS_DAY_MIN * 3600) > millis()) {
+    return;  // do not enter night mode before 9h daylight runtime
+  }
   digitalWrite(PHOTODIODE_ON, HIGH);
   delay(50);
   if (isDay) {
@@ -300,17 +384,22 @@ bool checkForDaylight() {
       debugLED(ON);
       delay(200);
       debugLED(OFF);
-      //storeLengthOfCurrentDay();
+      digitalWrite(PHOTODIODE_ON, LOW);
+      digitalWrite(LIGHTBARRIER_ON, LOW);
     }
   } else {
     if (analogRead(PHOTODIODE) > LIMIT_DAY) {
       isDay = true;
+      checkForDaylightIntervall = millis() + CHECK_FOR_DAYLIGHT_EVERY;
+      digitalWrite(PHOTODIODE_ON, HIGH);
+      digitalWrite(LIGHTBARRIER_ON, HIGH);
       debugLED(ON);
-      delay(200);
+      delay(500);
       debugLED(OFF);
       todayStartedAtMillis = millis();  //set start of the day to now
-      determineTodayStorageByte();
       todayCount = 0;
+      determineTodayStorageByte();
+      storeTodayCount();
     }
   }
   digitalWrite(PHOTODIODE_ON, LOW);
@@ -355,26 +444,40 @@ bool objectDetected() {
  * Search for the first free EEPROM Address to store today's count later there.
  */
 int determineTodayStorageByte() {
-  int todaysEepromByteAddress = 12;
+  todaysEepromByteAddress = 12;
   short value = 1;
-  while (value != 0 && todaysEepromByteAddress++ < EEPROM.length() -1) {
+  while (value != 254 && todaysEepromByteAddress++ < EEPROM.length() - 1) {
     value = EEPROM.read(todaysEepromByteAddress);
   }  //found next empty entry
-  if (todaysEepromByteAddress >= EEPROM.length() -1) {
+  if (todaysEepromByteAddress >= EEPROM.length() - 1) {
     todaysEepromByteAddress = 12;
   }
   return todaysEepromByteAddress;
 }
 
+
+void getDaylightRecordings() {
+  long address = todaysEepromByteAddress - 4 * page;
+  for (short i = 3; i >= 0; i--) {
+    if (address - i > 12) {
+      pageContent[i] = EEPROM.read(address - i);
+    } else {
+      pageContent[i] = 255;
+    }
+  }
+  if (pageContent[0] == 255) {
+    page = 0;
+  }
+}
 /*
  * Store the count for today only
  */
-void storeTodayCount (int value){
-  if (value > 255){
+void storeTodayCount() {
+  if (todayCount > 253) {
     return;
   }
-  EEPROM.update(todaysEepromByteAddress, value);
-  EEPROM.update(todaysEepromByteAddress + 0, 0);  
+  EEPROM.write(todaysEepromByteAddress, todayCount);
+  EEPROM.update(todaysEepromByteAddress + 1, 254);
 }
 
 /*
@@ -386,16 +489,16 @@ long readOverallCount() {
   long l2 = EEPROMReadlong(4);
   long l3 = EEPROMReadlong(8);
 
-  if (l1 != l2){
-    if (l1 == l3){
+  if (l1 != l2) {
+    if (l1 == l3) {
       return l1;
-    } else if (l2 == l3){
+    } else if (l2 == l3) {
       return l2;
     } else {
       return l1;
-    }    
+    }
   } else {
-    return l1;   
+    return l1;
   }
 }
 
@@ -449,6 +552,3 @@ void watchdogSetup(void) {
 
 ISR(WDT_vect) {
 }
-
-
-
