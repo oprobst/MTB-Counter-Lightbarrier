@@ -16,18 +16,18 @@
 
 #define DEBUG_BUTTON 3
 
-#define CHECK_FOR_DAYLIGHT_EVERY 300000  //ms how often to check daylight
+#define CHECK_FOR_DAYLIGHT_EVERY 120000  //ms how often to check daylight
 
-#define DURATION_DISPLAY_ON 120000  //ms how long the display should stay on
-#define CYCLES_TO_WAIT 40           // multiplied with 8sec = time to wait between brightness checks to wake up from night sleep
+#define DURATION_DISPLAY_ON 300000  //ms how long the display should stay on
+#define CYCLES_TO_WAIT 4           // multiplied with 8sec = time to wait between brightness checks to wake up from night sleep
 
 
-#define LIMIT_NIGHT 14       //20        // Measured limit to activate night mode
-#define LIMIT_DAY 30         //42          // Measured limit to activate day mode
-#define MEASUREMENTS_LIMIT 5  //consecutive measurements below LIMIT_NIGHT required before power down.
-#define HOURS_DAY_MIN 12      //minimum hours it must run every day before checking daylight
+#define LIMIT_NIGHT 14             // Measured limit to activate night mode
+#define LIMIT_DAY 30               // Measured limit to activate day mode
+#define MEASUREMENTS_LIMIT 5       //consecutive measurements below LIMIT_NIGHT required before power down.
+#define HOURS_DAY_MIN 10           //minimum hours it must run every day before checking daylight
 
-#include <LiquidCrystal.h>  //LCD-Bibliothek laden
+#include <LiquidCrystal.h>  
 #include <avr/wdt.h>
 #include <avr/sleep.h>
 #include <EEPROM.h>
@@ -51,10 +51,10 @@ bool displayOn = true;
 long millisDisplayOff = 0;
 
 //when to check for the next daylight
-int checkForDaylightIntervall = 0;
+long nextMillisToCheckForDaylight = millis() + CHECK_FOR_DAYLIGHT_EVERY;
 
 //number of brightness measurements below cutoff value
-short brightnessLimit = 0;
+short countOfMeasurementsOfNight = 0;
 //indicating night
 bool isDay = true;
 //counter for pwr down check on watchdog interrupt
@@ -65,7 +65,7 @@ long lastContactDuration = 0;
 //The day of recording
 long currentDayCycle = 1;
 
-long todayStartedAtMillis = 0;
+long todayStartedAtMillis = millis();
 
 // EEPROM Location to store todays count.
 int todaysEepromByteAddress = 0;
@@ -206,9 +206,8 @@ void loop() {
   if (isDay) {
     if (displayOn && millisDisplayOff < millis()) activateDisplay(OFF);
 
-    if (checkForDaylightIntervall < millis()) {
-      checkForDaylight();
-      checkForDaylightIntervall = millis() + CHECK_FOR_DAYLIGHT_EVERY;
+    if (nextMillisToCheckForDaylight < millis()) {
+      checkForDaylight();     
     }
 
   } else if (!isDay) {
@@ -369,18 +368,18 @@ void debugLED(bool on) {
  * If the brightness is measured MEASUREMENT_LIMIT times lower then defined LIMIT_NIGHT, this method will returns always false.
  */
 bool checkForDaylight() {
-  if (todayStartedAtMillis + (HOURS_DAY_MIN * 3600) > millis()) {
-    return;  // do not enter night mode before 9h daylight runtime
+  if (todayStartedAtMillis + (HOURS_DAY_MIN * 3600000) > millis()) {
+    return isDay;  // do not enter night mode before HOURS_DAY_MIN h daylight runtime
   }
   digitalWrite(PHOTODIODE_ON, HIGH);
   delay(50);
   if (isDay) {
     if (analogRead(PHOTODIODE) < LIMIT_NIGHT) {
-      brightnessLimit++;
+      countOfMeasurementsOfNight++;
     }
-    if (brightnessLimit >= MEASUREMENTS_LIMIT) {
+    if (countOfMeasurementsOfNight >= MEASUREMENTS_LIMIT) {
       isDay = false;
-      brightnessLimit = 0;
+      countOfMeasurementsOfNight = 0;
       debugLED(ON);
       delay(200);
       debugLED(OFF);
@@ -389,8 +388,7 @@ bool checkForDaylight() {
     }
   } else {
     if (analogRead(PHOTODIODE) > LIMIT_DAY) {
-      isDay = true;
-      checkForDaylightIntervall = millis() + CHECK_FOR_DAYLIGHT_EVERY;
+      isDay = true;      
       digitalWrite(PHOTODIODE_ON, HIGH);
       digitalWrite(LIGHTBARRIER_ON, HIGH);
       debugLED(ON);
@@ -398,11 +396,11 @@ bool checkForDaylight() {
       debugLED(OFF);
       todayStartedAtMillis = millis();  //set start of the day to now
       todayCount = 0;
-      determineTodayStorageByte();
-      storeTodayCount();
+      determineTodayStorageByte();     
     }
   }
   digitalWrite(PHOTODIODE_ON, LOW);
+  nextMillisToCheckForDaylight = millis() + CHECK_FOR_DAYLIGHT_EVERY;
   return isDay;
 }
 
