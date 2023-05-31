@@ -385,6 +385,7 @@ bool checkForDaylight() {
       debugLED(OFF);
       digitalWrite(PHOTODIODE_ON, LOW);
       digitalWrite(LIGHTBARRIER_ON, LOW);
+      storeTodayCount();
     }
   } else {
     if (analogRead(PHOTODIODE) > LIMIT_DAY) {
