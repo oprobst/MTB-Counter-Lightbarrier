@@ -1,14 +1,14 @@
-# Lichtschranke mit Unterbrechungszähler.
+# Lichtschranke mit Unterbrechungszähler
 
 Diese Implementierung wurde mit dem Hintergrund erstellt, auf einem Mountain-Bike Trail die Anzahl der Durchfahrten zu messen. Mit kleineren Anpassungen, kann diese Schaltung aber auch für alles Mögliche verwendet werden.
 
-* Ziel ist es, die Unterbrechungen der Lichtschranke zu zählen. Dies zum einen über den gesamten Lebenszyklus, wie auch auf täglicher Basis.
+* Ziel ist es, die Unterbrechungen der Lichtschranke zu zählen. Dies wird über den gesamten Lebenszyklus, wie auch auf täglicher Basis gezählt.
 * Weitere Anforderung ist ein möglichst geringer Stromverbrauch, um einen Einsatz mit Batterie im Feld möglich zu machen.
 
 
 # Bedienungsanleitung
 
-An der rechten oberen Seite der Verteilerdose ist ein Magnetkontakt angebracht. Dieser kann genutzt werden, um das Display zu aktivieren. Sobald ein Magnet an das Gehäuse gehalten wird, aktiviert sich das Display für 5 Minuten.
+An der rechten oberen Seite der Verteilerdose ist ein Magnetkontakt angebracht. Dieser kann genutzt werden, um das Display zu aktivieren. Sobald ein Magnet an das Gehäuse gehalten wird, aktiviert sich das Display für 5 Minuten. Im Normalbetrieb ist das Display aus, um Strom zu sparen und um zu verhindern, dass Fuchs und Hase daran herum spielen. Ein weitere Vorteil des Magneten liegt darin, dass eine fehleranfällige Gehäusedurchführung für einen Taster eingespart werden kann.
 
 ![Installation des Zählers im Wald](doc/imWald.jpg)
 
@@ -27,14 +27,14 @@ Letztlich steht ganz rechts oben eine Zahl mit einer Nachkommastelle. Hierbei ha
 
 Der Kontrast des Displays lässt sich mit einer Stellschraube auf halber Höhe des Zählers einstellen.
 
-## Zähler zurück setzen.
+## Zähler zurück setzen
 
 Es ist möglich den Zähler auf 0 zurück zu setzen. Dafür muss der linke ('Debug') Knopf gedrückt und gehalten werden. Dann der rechte ('Reset' Knopf) kurz gedrückt werden, während der Debug Knopf für weitere 10 Sekunden gehalten werden muss. Das Display zählt einen Countdown herunter und meldet dann 'Speicher gelöscht'.
 
 
 # Umsetzung
 
-##Generelles Setup
+## Generelles Setup
 
 Die Schaltung ist mit einer 10W Peak Solarzelle ausgestattet, die über einen Solarladeregler einen 5,4Ah Bleigelakku lädt. Diese versorgt die Schaltung über eine Sicherung (<=100mA ist ausreichend).
 Aus der Versorgungsspannung wird die Lichtschranke direkt bedient und die Platine über einen 3,3V DCDC Wandler betrieben.
