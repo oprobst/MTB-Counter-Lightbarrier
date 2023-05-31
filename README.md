@@ -8,7 +8,7 @@ Diese Implementierung wurde mit dem Hintergrund erstellt, auf einem Mountain-Bik
 
 # Bedienungsanleitung
 
-An der rechten oberen Seite der Verteilerdose ist ein Magnetkontakt angebracht. Dieser kann genutzt werden, um das Display zu aktivieren. Sobald ein Magnet an das Gehäuse gehalten wird, aktiviert sich das Display für 5 Minuten. Im Normalbetrieb ist das Display aus, um Strom zu sparen und um zu verhindern, dass Fuchs und Hase daran herum spielen. Ein weitere Vorteil des Magneten liegt darin, dass eine fehleranfällige Gehäusedurchführung für einen Taster eingespart werden kann.
+An der rechten oberen Seite der Verteilerdose ist ein Magnetkontakt angebracht. Dieser kann genutzt werden, um das Display zu aktivieren. Sobald ein Magnet an das Gehäuse gehalten wird, aktiviert sich das Display für 5 Minuten. Im Normalbetrieb ist das Display aus, um Strom zu sparen und um zu verhindern, dass Fuchs und Hase daran herum spielen. Ein weiterer Vorteil des Magneten liegt darin, dass eine fehleranfällige Gehäusedurchführung für einen Taster eingespart werden kann.
 
 ![Installation des Zählers im Wald](doc/imWald.jpg)
 
