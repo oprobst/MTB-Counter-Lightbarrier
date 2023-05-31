@@ -3,7 +3,7 @@
 Diese Implementierung wurde mit dem Hintergrund erstellt, auf einem Mountain-Bike Trail die Anzahl der Durchfahrten zu messen. Mit kleineren Anpassungen, kann diese Schaltung aber auch für alles Mögliche verwendet werden.
 
 * Ziel ist es, die Unterbrechungen der Lichtschranke zu zählen. Dies wird über den gesamten Lebenszyklus, wie auch auf täglicher Basis gezählt.
-* Weitere Anforderung ist ein möglichst geringer Stromverbrauch, um einen Einsatz mit Batterie im Feld möglich zu machen.
+* Weitere Anforderung ist ein möglichst geringer Stromverbrauch, um einen Einsatz mit Batterie im Feld zu vereinfachen.
 
 
 # Bedienungsanleitung
