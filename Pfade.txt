@@ -1,0 +1,9 @@
+
+READ: 
+C:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17\bin\avrdude.exe "-CC:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17/etc/avrdude.conf" -v -patmega328p -cstk500v2 -Pusb -U hfuse:r:-:h -U lfuse:r:-:h
+
+SET LATENCY
+C:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17\bin\avrdude.exe "-CC:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17/etc/avrdude.conf" -v -patmega328p -cstk500v2 -Pusb -e -B64
+
+WRITE:
+ C:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17\bin\avrdude.exe "-CC:\Users\Olive\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17/etc/avrdude.conf" -v -patmega328p -cstk500v2 -Pusb -e -U lfuse:w:0xE3:m -U hfuse:w:0xD1:m -U efuse:w:0xFF:m -U lock:w:0x3F:m
