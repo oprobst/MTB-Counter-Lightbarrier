@@ -1,16 +1,15 @@
-
 #define ON 1
 #define OFF 0
 
 #define DEBUG_LED 7
-#define LCD_ON 6
-#define LCD_LED A2
+#define LCD_LED 6
 
 #define PHOTODIODE_ON 0
 #define PHOTODIODE A5
 
 #define LIGHTBARRIER_ON 4
 #define LIGHTBARRIER A3
+#define LIGHTBARRIER2 A2
 
 #define BATTERY_VOLTAGE A4
 
@@ -97,18 +96,17 @@ bool lastDayMode = false;
 void setup() {
 
   pinMode(DEBUG_LED, OUTPUT);
-  pinMode(LCD_ON, OUTPUT);
   pinMode(LCD_LED, OUTPUT);
   pinMode(PHOTODIODE_ON, OUTPUT);
   pinMode(PHOTODIODE, INPUT);
   pinMode(LIGHTBARRIER_ON, OUTPUT);
   pinMode(LIGHTBARRIER, INPUT);
+  pinMode(LIGHTBARRIER2, INPUT);
   pinMode(DEBUG_BUTTON, INPUT_PULLUP);
   //Pin6 is not arduino API compatible, need to set it manually:
   DDRB &= ~(1 << PB6);  //input
   PORTB |= (1 << PB6);  //pullup
 
-  digitalWrite(LCD_ON, HIGH);
   digitalWrite(LCD_LED, HIGH);
   digitalWrite(PHOTODIODE_ON, HIGH);
   digitalWrite(LIGHTBARRIER_ON, HIGH);
@@ -172,17 +170,21 @@ void loop() {
 
   checkBarrier();
 
-  //update display every 0,5 sec if on:
-  if (displayOn && lastDisplayUpdate + 500 < millis()) {
-    showOutput();
-    lastDisplayUpdate = millis();
-  }
 
-  if (displayOn && lastDisplayPageSwitch + 10000 < millis()) {
-    page++;
-    lastDisplayPageSwitch = millis();
-  }
+  if(displayOn){
+    //update display every 0,5 sec if on:
+    if (lastDisplayUpdate + 500 < millis()) {
+      showOutput();
+      lastDisplayUpdate = millis();
+    }
 
+    if (lastDisplayPageSwitch + 10000 < millis()) {
+      page++;
+      lastDisplayPageSwitch = millis();
+    }
+
+    if (millisDisplayOff < millis()) activateDisplay(OFF);
+  }
   // check if debug button is pushed
   if (readDebugButton()) {
     debugLED(ON);
@@ -204,15 +206,11 @@ void loop() {
   }
 
   if (isDay) {
-    if (displayOn && millisDisplayOff < millis()) activateDisplay(OFF);
-
     if (nextMillisToCheckForDaylight < millis()) {
       checkForDaylight();     
     }
 
-  } else if (!isDay) {
-    if (displayOn) activateDisplay(OFF);
-
+  } else if (!isDay) {  
     wdt_reset();
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);  // choose power down mode
     sleep_mode();                         // sleep now!
@@ -227,9 +225,7 @@ void loop() {
 
 
 /* 
- * Barrier should contacts longer 25ms (30cm object at 5km/h) and shorter 250ms (30cm object at 40km/h). 
- * After first contact, we block the sensor for 300ms (two biker at 30km/h with a gap of 2,5m between).
- * Return true, if at least 3 consecutive measurements are detecting a contact.
+ * Check barrier is blocked
  */
 bool checkBarrier() {
   long startContact = millis();
@@ -241,7 +237,7 @@ bool checkBarrier() {
     if (millis() > startContact + 2000) {
       for (short i = 0; i < 10; i++) {
         debugLED(ON);
-        delay(50);
+        delay(200);
         debugLED(OFF);
         delay(50);
       }
@@ -251,12 +247,21 @@ bool checkBarrier() {
   }
   if (detection) {
     lastContactDuration = millis() - startContact;
-    storeOverallCount(++overallCount);
+    storeOverallCount(++overallCount);      
     todayCount++;
-    storeTodayCount();
-    delay(300);
+    storeTodayCount();    
+    debugLED(ON);
+    delay(50);
+    debugLED(OFF);
+    delay(50);    
+    debugLED(ON);
+    delay(50);
+    debugLED(OFF);
+    delay(50);
+    debugLED(ON);
+    delay(50);
+    debugLED(OFF);
   }
-  return detection;
 }
 
 
@@ -302,6 +307,7 @@ void showOutput() {
   }
 }
 
+
 /*
  * Show some debug output on lcd display
  */
@@ -331,13 +337,14 @@ void showDebugOutput() {
   lcd.print("C:");
   lcd.print(todayCount);
 
-  lcd.setCursor(9, 1);
-  lcd.print(" D:");
+  lcd.setCursor(4, 1);
+  lcd.print(" t:");
   lcd.print(lastContactDuration);
 
-  //lcd.setCursor(8, 1);
-  //lcd.print("M:");
-  //lcd.print(todaysEepromByteAddress);
+ // lcd.setCursor(9, 1);
+  //lcd.print(analogRead(LIGHTBARRIER));
+  //lcd.print("|");
+  //lcd.print(analogRead(LIGHTBARRIER2));
 }
 
 /* 
@@ -427,7 +434,7 @@ void activateDisplay(bool on) {
  *  Measure Battery voltage
  */
 double readBatteryVoltage() {
-  return 14.3 / 1023.0 * (double)analogRead(BATTERY_VOLTAGE) + 0.7d;
+  return 14.3 / 1023.0 * (double)analogRead(BATTERY_VOLTAGE) + 1.0d;
 }
 
 
@@ -435,7 +442,24 @@ double readBatteryVoltage() {
  *  returns true, when something blocks the light barrier
  */
 bool objectDetected() {
-  return analogRead(LIGHTBARRIER) > 100;
+  int start = millis();////////////
+  int waitFor = 2500;
+  if (analogRead(LIGHTBARRIER) > 100){
+    while (waitFor-- > 0) {
+       if (analogRead(LIGHTBARRIER2) > 100) {  
+        return true;
+       }
+       //delay (1);
+     }
+  } else if (analogRead(LIGHTBARRIER2) > 100){
+     while (waitFor-- > 0) {
+       if (analogRead(LIGHTBARRIER) > 100){
+          return true;
+       }
+      //delay (1);
+     }  
+  }
+  return false;
 }
 
 

@@ -33,4 +33,5 @@ google-services.json
 *.hprof
 
 # Personal note... :)
-Pfade.txt
+Pfade.txt.vscode/
+code/MTB-Lightbarrier/.theia/
