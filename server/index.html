@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bike Counter API Dokumentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            color: #0056b3;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h2 {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f8f8;
+            font-weight: bold;
+        }
+        .method-post {
+            background-color: #e6f7ff; /* Light blue for POST */
+            font-weight: bold;
+            color: #007bff;
+        }
+        .method-get {
+            background-color: #e6ffe6; /* Light green for GET */
+            font-weight: bold;
+            color: #28a745;
+        }
+        pre {
+            background-color: #eee;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin-bottom: 20px;
+        }
+        .example-title {
+            font-weight: bold;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+        .endpoint-details {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .endpoint-details h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .error-table th {
+            background-color: #ffe6e6;
+            color: #dc3545;
+        }
+        .error-table td {
+            background-color: #fffafa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bike Counter API Dokumentation</h1>
+
+        <p>Die <b>Bike Counter API</b> ist eine speziell für den MTB Murgtal Fahrradzähler entwickelte Schnittstelle. Sie ermöglicht den Empfang und Export von detaillierten Fahrten- und Tagesberichten, bereitgestellt über die <code>bike_counter.php</code>-Datei.</p>
+        <p><strong>Basis-URL:</strong> <code>https://www.oliver-probst.de/mtb-club/bike_counter.php/api</code></p>
+
+        <h2>🚦 Endpunkt-Übersicht</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Methode</th>
+                    <th>Endpunkt</th>
+                    <th>Beschreibung</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="method-post">POST</td>
+                    <td><code>/daily-report</code></td>
+                    <td>Empfängt aggregierte Tagesdaten und einzelne Fahrten von einem Arduino-Gerät. Erfordert Basic Auth.</td>
+                </tr>
+                <tr>
+                    <td class="method-get">GET</td>
+                    <td><code>/daily-summary</code></td>
+                    <td>Ruft eine Zusammenfassung der täglichen Fahrten für einen bestimmten Datumsbereich ab.</td>
+                </tr>
+                <tr>
+                    <td class="method-get">GET</td>
+                    <td><code>/rides</code></td>
+                    <td>Ruft detaillierte Informationen zu jeder einzelnen Fahrt für ein spezifisches Datum ab.</td>
+                </tr>
+                <tr>
+                    <td class="method-get">GET</td>
+                    <td><code>/rides-csv</code></td>
+                    <td>Exportiert einzelne Fahrten als CSV-Datei.</td>
+                </tr>
+                <tr>
+                    <td class="method-get">GET</td>
+                    <td><code>/report-csv</code></td>
+                    <td>Exportiert tägliche Berichte (aggregierte Tagesberichte) als CSV-Datei.</td>
+                </tr>
+                <tr>
+                    <td class="method-get">GET</td>
+                    <td><code>/battery-status</code></td>
+                    <td>Ruft den neuesten aufgezeichneten Batteriespannungswert des Arduino-Geräts ab.</td>
+                </tr>
+                <tr>
+                    <td class="method-get">GET</td>
+                    <td><code>/total-count</code></td>
+                    <td>Liefert die aktuellste Gesamtzahl aller Fahrten seit Installation.</td>
+                </tr>
+                <tr>
+                    <td class="method-get">GET</td>
+                    <td><code>/status</code></td>
+                    <td>Einfacher Endpunkt zur Überprüfung, ob die API erreichbar ist und welche Version sie hat.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🚀 Detaillierte Endpunkte mit Beispielen</h2>
+
+        <div class="endpoint-details">
+            <h3 style="color: blue;">➡️ POST /daily-report</h3>
+            <p>Empfängt aggregierte Tagesdaten und einzelne Fahrten von einem Arduino-Gerät. Dieser Endpunkt erfordert eine Authentifizierung über Basic Auth.</p>
+            <p><strong>Beschreibung:</strong> Übermittelt Tageszusammenfassungen und die genauen Zeitpunkte jeder einzelnen Fahrt. Ideal, um Daten von einem Arduino-Gerät an das Backend zu senden.</p>
+
+            <p class="example-title">Beispielanfrage (JSON Body):</p>
+            <pre><code>{
+  "transmission_date": "2024-06-02 14:30:00",
+  "measurement_date": "2024-06-01",
+  "start_second_of_day": 28800,
+  "end_second_of_day": 64800,
+  "daily_count": 42,
+  "total_count_ever": 123456,
+  "battery_voltage": 12.34,
+  "ride_timestamps": [28805, 29120, 35600, 48100, 52000]
+}</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK):</p>
+            <pre><code>{
+  "success": true,
+  "message": "Daily report saved successfully",
+  "report_id": 123,
+  "rides_saved": 5,
+  "timestamp": "2024-06-02T14:30:00+02:00"
+}</code></pre>
+        </div>
+
+        <div class="endpoint-details">
+            <h3 style="color: green;">⬅️ GET /daily-summary</h3>
+            <p>Ruft eine Zusammenfassung der täglichen Fahrten für einen bestimmten Datumsbereich ab.</p>
+            <p><strong>Beschreibung:</strong> Dieser Endpunkt ist perfekt, um sich einen Überblick über die täglichen Zählungen in einem bestimmten Zeitraum zu verschaffen.</p>
+
+            <p class="example-title">Parameter:</p>
+            <ul>
+                <li><code>start_date</code> (Format: <code>YYYY-MM-DD</code>, z.B. <code>2024-05-01</code>)</li>
+                <li><code>end_date</code> (Format: <code>YYYY-MM-DD</code>, z.B. <code>2024-05-31</code>)</li>
+            </ul>
+
+            <p class="example-title">Beispielanfrage:</p>
+            <pre><code>GET /daily-summary?start_date=2024-05-01&amp;end_date=2024-05-31</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK):</p>
+            <pre><code>{
+  "period": {
+    "start": "2024-05-01",
+    "end": "2024-05-31"
+  },
+  "total_days": 31,
+  "total_rides": 1234,
+  "daily_summaries": [
+    {
+      "measurement_date": "2024-05-15",
+      "daily_count": 45,
+      "total_count_ever": 123456,
+      "battery_voltage": 12.1,
+      "start_time": "08:00:00",
+      "end_time": "18:00:00",
+      "transmission_date": "2024-05-15 18:05:00",
+      "recorded_rides": 45,
+      "first_ride": "08:00:05",
+      "last_ride": "17:59:30"
+    }
+  ]
+}</code></pre>
+        </div>
+
+        <div class="endpoint-details">
+            <h3 style="color: green;">⬅️ GET /rides</h3>
+            <p>Ruft detaillierte Informationen zu jeder einzelnen Fahrt für ein spezifisches Datum ab.</p>
+            <p><strong>Beschreibung:</strong> Wenn Sie wissen möchten, wann genau an einem bestimmten Tag eine Fahrt registriert wurde, ist dies der richtige Endpunkt.</p>
+
+            <p class="example-title">Parameter:</p>
+            <ul>
+                <li><code>date</code> (Format: <code>YYYY-MM-DD</code>, z.B. <code>2024-05-15</code>)</li>
+            </ul>
+
+            <p class="example-title">Beispielanfrage:</p>
+            <pre><code>GET /rides?date=2024-05-15</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK):</p>
+            <pre><code>{
+  "date": "2024-05-15",
+  "total_rides": 42,
+  "daily_total": 42,
+  "period": {
+    "start": "08:00:00",
+    "end": "18:00:00"
+  },
+  "battery_voltage": 12.1,
+  "rides": [
+    {
+      "time": "08:00:05",
+      "second_of_day": 28805
+    },
+    {
+      "time": "08:05:20",
+      "second_of_day": 29120
+    }
+  ]
+}</code></pre>
+            <p class="example-title">Beispielantwort (404 Not Found):</p>
+            <pre><code>{
+  "date": "2024-05-15",
+  "message": "No rides found for this date",
+  "rides": []
+}</code></pre>
+        </div>
+
+        <div class="endpoint-details">
+            <h3 style="color: green;">⬅️ GET /rides-csv</h3>
+            <p>Exportiert einzelne Fahrten als CSV-Datei.</p>
+            <p><strong>Beschreibung:</strong> Zum Herunterladen einer CSV-Datei mit Datum und Uhrzeit jeder einzelnen erfassten Fahrt. Nützlich für Analysen.</p>
+
+            <p class="example-title">Parameter (optional):</p>
+            <ul>
+                <li><code>start_date</code> (Format: <code>YYYY-MM-DD</code>, z.B. <code>2024-01-01</code>)</li>
+                <li><code>end_date</code> (Format: <code>YYYY-MM-DD</code>, z.B. <code>2024-12-31</code>)</li>
+            </ul>
+
+            <p class="example-title">Beispielanfrage:</p>
+            <pre><code>GET /rides-csv?start_date=2024-01-01&amp;end_date=2024-01-31</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK - CSV-Inhalt):</p>
+            <pre><code>"count_number","date","time"
+1,"2024-01-01","08:00:05"
+2,"2024-01-01","08:05:20"
+3,"2024-01-01","09:10:00"
+...</code></pre>
+        </div>
+
+        <div class="endpoint-details">
+            <h3 style="color: green;">⬅️ GET /report-csv</h3>
+            <p>Exportiert tägliche Berichte als CSV-Datei.</p>
+            <p><strong>Beschreibung:</strong> Lädt eine CSV-Datei mit den aggregierten Tagesberichten herunter.</p>
+
+            <p class="example-title">Parameter (optional):</p>
+            <ul>
+                <li><code>start_date</code> (Format: <code>YYYY-MM-DD</code>, z.B. <code>2024-01-01</code>)</li>
+                <li><code>end_date</code> (Format: <code>YYYY-MM-DD</code>, z.B. <code>2024-12-31</code>)</li>
+            </ul>
+
+            <p class="example-title">Beispielanfrage:</p>
+            <pre><code>GET /report-csv?start_date=2024-01-01&amp;end_date=2024-01-31</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK - CSV-Inhalt):</p>
+            <pre><code>"measurement_date","daily_count","total_count_ever","battery_voltage","start_time","end_time","transmission_date","recorded_rides","first_ride","last_ride"
+"2024-01-01",42,123456,12.34,"08:00:00","18:00:00","2024-01-01 18:05:00",42,"08:00:05","17:59:30"
+"2024-01-02",38,123494,12.28,"07:30:00","17:45:00","2024-01-02 17:50:00",38,"07:30:10","17:40:00"
+...</code></pre>
+        </div>
+
+        <div class="endpoint-details">
+            <h3 style="color: green;">⬅️ GET /battery-status</h3>
+            <p>Ruft den neuesten aufgezeichneten Batteriespannungswert des Arduino-Geräts ab.</p>
+            <p><strong>Beschreibung:</strong> Überprüfen Sie den aktuellen Batteriestand des Zählers.</p>
+
+            <p class="example-title">Beispielanfrage:</p>
+            <pre><code>GET /battery-status</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK - Daten verfügbar):</p>
+            <pre><code>{
+  "battery_voltage": 12.5,
+  "measurement_date": "2024-06-02",
+  "last_transmission": "2024-06-02 14:35:00",
+  "status": "OK"
+}</code></pre>
+            <p class="example-title">Beispielantwort (200 OK - Keine Daten verfügbar):</p>
+            <pre><code>{
+  "message": "No battery data available"
+}</code></pre>
+        </div>
+
+        <div class="endpoint-details">
+            <h3 style="color: green;">⬅️ GET /total-count</h3>
+            <p>Liefert die aktuellste Gesamtzahl aller Fahrten seit Installation.</p>
+            <p><strong>Beschreibung:</strong> Erhalten Sie den kumulierten Zählerstand seit Inbetriebnahme des Geräts.</p>
+
+            <p class="example-title">Beispielanfrage:</p>
+            <pre><code>GET /total-count</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK - Daten verfügbar):</p>
+            <pre><code>{
+  "total_count_ever": 123456,
+  "measurement_date": "2024-06-02",
+  "last_transmission": "2024-06-02 14:35:00"
+}</code></pre>
+            <p class="example-title">Beispielantwort (200 OK - Keine Daten verfügbar):</p>
+            <pre><code>{
+  "message": "No count data available"
+}</code></pre>
+        </div>
+
+        <div class="endpoint-details">
+            <h3 style="color: green;">⬅️ GET /status</h3>
+            <p>Einfacher Endpunkt zur Überprüfung, ob die API erreichbar ist und welche Version sie hat.</p>
+            <p><strong>Beschreibung:</strong> Ein schneller Check, um die Verfügbarkeit und Version der API zu prüfen.</p>
+
+            <p class="example-title">Beispielanfrage:</p>
+            <pre><code>GET /status</code></pre>
+
+            <p class="example-title">Beispielantwort (200 OK):</p>
+            <pre><code>{
+  "status": "OK",
+  "version": "1.0"
+}</code></pre>
+        </div>
+
+        <h2>⚠️ Fehlerantworten</h2>
+        <p>Bei Fehlern gibt die API standardisierte JSON-Antworten zurück, die eine Fehlermeldung und einen Zeitstempel enthalten.</p>
+        <table class="error-table">
+            <thead>
+                <tr>
+                    <th>Status Code</th>
+                    <th>Beschreibung</th>
+                    <th>Beispiel (JSON Body)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>400</code></td>
+                    <td><strong>Bad Request:</strong> Ungültige Anfrage oder fehlende Parameter.</td>
+                    <td><pre><code>{ "error": "Missing required field: daily_count", "timestamp": "2024-06-02T14:30:00+02:00" }</code></pre></td>
+                </tr>
+                <tr>
+                    <td><code>401</code></td>
+                    <td><strong>Unauthorized:</strong> Authentifizierung erforderlich oder fehlgeschlagen.</td>
+                    <td><pre><code>{ "error": "Authentication required", "timestamp": "2024-06-02T14:30:00+02:00" }</code></pre></td>
+                </tr>
+                <tr>
+                    <td><code>500</code></td>
+                    <td><strong>Internal Server Error:</strong> Interner Serverfehler.</td>
+                    <td><pre><code>{ "error": "An unexpected error occurred", "timestamp": "2024-06-02T14:30:00+02:00" }</code></pre></td>
+                </tr>
+            </tbody>
+        </table>
+
+    </div>
+</body>
+</html>

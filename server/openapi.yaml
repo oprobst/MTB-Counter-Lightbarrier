@@ -1,0 +1,488 @@
+openapi: 3.0.0
+info:
+  title: Bike Counter API
+  description: |
+    API für den Arduino Fahrradzähler, um Fahrten und tägliche Berichte zu empfangen und zu exportieren.
+    Diese API wird von der `bike_counter.php` Datei bereitgestellt.
+  version: 1.0.0 # Basierend auf dem config['API_VERSION'] Wert, kann angepasst werden
+servers:
+  - url: https://www.oliver-probst.de/mtb-club/bike_counter.php/api
+    description: Produktionsserver
+
+paths:
+  /daily-report:
+    post:
+      summary: Neuen täglichen Bericht empfangen
+      description: Empfängt aggregierte Tagesdaten und einzelne Fahrten von einem Arduino-Gerät.
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - transmission_date
+                - measurement_date
+                - start_second_of_day
+                - end_second_of_day
+                - daily_count
+                - total_count_ever
+                - battery_voltage
+                - ride_timestamps
+              properties:
+                transmission_date:
+                  type: string
+                  format: date-time
+                  description: Datum und Uhrzeit der Übertragung (YYYY-MM-DD HH:MM:SS).
+                  example: "2024-06-02 14:30:00"
+                measurement_date:
+                  type: string
+                  format: date
+                  description: Datum der Messung (YYYY-MM-DD).
+                  example: "2024-06-01"
+                start_second_of_day:
+                  type: integer
+                  description: Startsekunde des Tages für die Messperiode (0-86399).
+                  minimum: 0
+                  maximum: 86399
+                  example: 28800 # 08:00:00
+                end_second_of_day:
+                  type: integer
+                  description: Endsekunde des Tages für die Messperiode (0-86399).
+                  minimum: 0
+                  maximum: 86399
+                  example: 64800 # 18:00:00
+                daily_count:
+                  type: integer
+                  description: Gesamtzahl der Fahrten für diesen Tag.
+                  minimum: 0
+                  example: 42
+                total_count_ever:
+                  type: integer
+                  description: Gesamtzahl der Fahrten seit Installation.
+                  minimum: 0
+                  example: 123456
+                battery_voltage:
+                  type: number
+                  format: float
+                  description: Aktueller Batteriespannungswert in Volt.
+                  minimum: 0.0
+                  example: 12.34
+                ride_timestamps:
+                  type: array
+                  description: Liste der Sekunden des Tages für jede einzelne Fahrt.
+                  items:
+                    type: integer
+                    minimum: 0
+                    maximum: 86399
+                  example: [28805, 29120, 35600, 48100, 52000]
+      responses:
+        '200':
+          description: Täglicher Bericht erfolgreich gespeichert.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Daily report saved successfully"
+                  report_id:
+                    type: integer
+                    example: 123
+                  rides_saved:
+                    type: integer
+                    example: 5
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-06-02T14:30:00+02:00"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /daily-summary:
+    get:
+      summary: Tägliche Fahrten-Zusammenfassung abrufen
+      description: Ruft eine Zusammenfassung der täglichen Fahrten für einen bestimmten Datumsbereich ab.
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: Startdatum im Format YYYY-MM-DD.
+          example: 2024-05-01
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+          description: Enddatum im Format YYYY-MM-DD.
+          example: 2024-05-31
+      responses:
+        '200':
+          description: Erfolgreiche Abfrage der Tageszusammenfassungen.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date
+                        example: 2024-05-01
+                      end:
+                        type: string
+                        format: date
+                        example: 2024-05-31
+                  total_days:
+                    type: integer
+                    example: 31
+                  total_rides:
+                    type: integer
+                    example: 1234
+                  daily_summaries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        measurement_date:
+                          type: string
+                          format: date
+                          example: 2024-05-15
+                        daily_count:
+                          type: integer
+                          example: 45
+                        total_count_ever:
+                          type: integer
+                          example: 123456
+                        battery_voltage:
+                          type: number
+                          format: float
+                          example: 12.1
+                        start_time:
+                          type: string
+                          example: "08:00:00"
+                        end_time:
+                          type: string
+                          example: "18:00:00"
+                        transmission_date:
+                          type: string
+                          format: date-time
+                          example: "2024-05-15 18:05:00"
+                        recorded_rides:
+                          type: integer
+                          description: Anzahl der tatsächlich aufgezeichneten Einzelrides für diesen Tag.
+                          example: 45
+                        first_ride:
+                          type: string
+                          description: Uhrzeit der ersten Fahrt des Tages.
+                          example: "08:00:05"
+                        last_ride:
+                          type: string
+                          description: Uhrzeit der letzten Fahrt des Tages.
+                          example: "17:59:30"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /rides:
+    get:
+      summary: Einzelne Fahrten für einen bestimmten Tag abrufen
+      description: Ruft detaillierte Informationen zu jeder einzelnen Fahrt für ein spezifisches Datum ab.
+      parameters:
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+          description: Datum im Format YYYY-MM-DD.
+          example: 2024-05-15
+      responses:
+        '200':
+          description: Erfolgreiche Abfrage der einzelnen Fahrten.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                    example: 2024-05-15
+                  total_rides:
+                    type: integer
+                    example: 42
+                  daily_total:
+                    type: integer
+                    example: 42
+                  period:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        example: "08:00:00"
+                      end:
+                        type: string
+                        example: "18:00:00"
+                  battery_voltage:
+                    type: number
+                    format: float
+                    example: 12.1
+                  rides:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        time:
+                          type: string
+                          example: "08:00:05"
+                        second_of_day:
+                          type: integer
+                          example: 28805
+        '404':
+          description: Keine Fahrten für das angegebene Datum gefunden.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    example: 2024-05-15
+                  message:
+                    type: string
+                    example: "No rides found for this date"
+                  rides:
+                    type: array
+                    items: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /rides-csv:
+    get:
+      summary: Exportiert einzelne Fahrten als CSV
+      description: Lädt eine CSV-Datei mit der Zählernummer jeder einzelnen Durchfahrt, Datum und Uhrzeit der Fahrt herunter.
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: Optionales Startdatum im Format YYYY-MM-DD für den Export.
+          example: 2024-01-01
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+          description: Optionales Enddatum im Format YYYY-MM-DD für den Export.
+          example: 2024-12-31
+      responses:
+        '200':
+          description: CSV-Datei mit einzelnen Fahrten.
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary # Repräsentiert die CSV-Datei
+        '404':
+          description: Keine Fahrten für den angegebenen Zeitraum verfügbar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /report-csv:
+    get:
+      summary: Exportiert tägliche Berichte als CSV
+      description: Lädt eine CSV-Datei mit den aggregierten Tagesberichten (daily_reports) herunter.
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+          description: Optionales Startdatum im Format YYYY-MM-DD für den Export.
+          example: 2024-01-01
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+          description: Optionales Enddatum im Format YYYY-MM-DD für den Export.
+          example: 2024-12-31
+      responses:
+        '200':
+          description: CSV-Datei mit täglichen Berichten.
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary # Repräsentiert die CSV-Datei
+        '404':
+          description: Keine täglichen Berichtsdaten für den angegebenen Zeitraum verfügbar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /battery-status:
+    get:
+      summary: Aktuellen Batteriestatus abrufen
+      description: Ruft den neuesten aufgezeichneten Batteriespannungswert des Arduino-Geräts ab.
+      responses:
+        '200':
+          description: Erfolgreiche Abfrage des Batteriestatus.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  battery_voltage:
+                    type: number
+                    format: float
+                    example: 12.5
+                  measurement_date:
+                    type: string
+                    format: date
+                    example: 2024-06-02
+                  last_transmission:
+                    type: string
+                    format: date-time
+                    example: "2024-06-02 14:35:00"
+                  status:
+                    type: string
+                    enum: [OK, LOW]
+                    example: OK
+        '200':
+          description: Keine Batteriedaten verfügbar.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "No battery data available"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /total-count:
+    get:
+      summary: Aktuellen Gesamtzählerstand abrufen
+      description: Liefert die aktuellste Gesamtzahl aller Fahrten seit Installation.
+      responses:
+        '200':
+          description: Erfolgreiche Abfrage des Gesamtzählerstands.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_count_ever:
+                    type: integer
+                    example: 123456
+                  measurement_date:
+                    type: string
+                    format: date
+                    example: 2024-06-02
+                  last_transmission:
+                    type: string
+                    format: date-time
+                    example: "2024-06-02 14:35:00"
+        '200':
+          description: Keine Zähldaten verfügbar.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "No count data available"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /status:
+    get:
+      summary: API-Statusprüfung
+      description: Einfacher Endpunkt zur Überprüfung, ob die API erreichbar ist und welche Version sie hat.
+      responses:
+        '200':
+          description: API ist erreichbar.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: OK
+                  version:
+                    type: string
+                    example: 1.0
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+  responses:
+    BadRequest:
+      description: Ungültige Anfrage oder fehlende Parameter.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentifizierung erforderlich oder fehlgeschlagen.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+            example: Basic realm="Bike Counter API"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: Interner Serverfehler.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Missing required field: daily_count"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-06-02T14:30:00+02:00"
