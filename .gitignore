@@ -32,7 +32,18 @@ google-services.json
 # Android Profiling
 *.hprof
 
-# Personal note... :)
+# Personal notes... :)
 Pfade.txt.vscode/
 code/MTB-Lightbarrier/.theia/
 .vscode/
+
+# PIN, to be kept secret.
+**/*/PIN.h
+# config.properties with secrets
+**/*/config.properties
+
+# temporary eagle files
+Eagle/Schaltung/Schaltplan.s\#*
+Eagle/Schaltung/Schaltplan.b\#*
+Eagle/Schaltung/eagle.epf
+Eagle/Schaltung/Schaltplan_snap.scr
